@@ -3,11 +3,8 @@ import torch
 from torch.utils.data import Dataset
 
 
-from execution.preprocessing.tree_structure.node_exception import NodeException
-
-
 class TorchDatasetWrapper(Dataset):
-    def __init__(self, x, y, effective_lengths):
+    def __init__(self, x, y):
         self.x = x
         self.y = y
 
@@ -22,7 +19,7 @@ class TorchDatasetWrapper(Dataset):
         return numpy.size(self.x, axis=0) if self.x is not None else 0
 
 
-class AbstractDataSets:
+class AbstractDataSet:
     def __init__(self, subtree):
         self.train = None
         self.test = None
@@ -50,10 +47,10 @@ class AbstractDataSets:
         return numpy.size(self.test, axis=0) if self.test is not None else 0
 
     def get_wrapped_train(self):
-        return TorchDatasetWrapper(self.train, self.target_train, self.train_effective_length)
+        return TorchDatasetWrapper(self.train, self.target_train)
 
     def get_wrapped_test(self):
-        return TorchDatasetWrapper(self.test, self.target_test, self.test_effective_length)
+        return TorchDatasetWrapper(self.test, self.target_test)
 
     def get_config(self):
         return {

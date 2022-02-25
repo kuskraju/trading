@@ -5,7 +5,7 @@ import torch.nn.functional as f
 from torch import nn
 
 from Conformer.ConformerFeedForward import ConformerFeedForward
-from Conformer.RelativeMultiHeadAttention import RelativeMultiHeadAttention, get_clones
+from Conformer.RelativeMultiHeadAttention import RelativeMultiHeadAttention
 
 
 class ConformerEncoderLayer(nn.Module):
@@ -13,9 +13,10 @@ class ConformerEncoderLayer(nn.Module):
     def __init__(self, device, d_model, heads, length, dropout=0.1):
         super().__init__()
         self.device = device
+        self.d_model = d_model
         self.norm = nn.LayerNorm(self.d_model).to(self.device)
 
-        self.attn = MultiHeadAttention(self.device, heads, d_model, length, dropout=dropout)
+        self.attn = RelativeMultiHeadAttention(self.device, heads, d_model, length, dropout=dropout)
 
         self.ff_1 = ConformerFeedForward(self.device, d_model, dropout=dropout)
         self.ff_2 = ConformerFeedForward(self.device, d_model, dropout=dropout)
@@ -95,6 +96,6 @@ class DepthWiseConv1d(nn.Module):
         self.conv_out = nn.Conv1d(chan_out, chan_out, 1)
 
     def forward(self, x):
-        x = F.pad(x, self.padding)
+        x = f.pad(x, self.padding)
         x = self.conv(x)
         return self.conv_out(x)

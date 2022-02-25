@@ -4,22 +4,23 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 import math
-import numpy as np
 
 
-def get_clones(module, N):
-    return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
+def get_clones(module, n):
+    return nn.ModuleList([copy.deepcopy(module) for i in range(n)])
+
 
 def attention(q, k, v, d_k, rel_pos, dropout=None):
     scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(d_k)
 
     scores += torch.einsum('bhad,adl->bhal', q, rel_pos)
 
-    scores = F.softmax(scores, dim=-1)
+    scores = f.softmax(scores, dim=-1)
     if dropout is not None:
         scores = dropout(scores)
     output = torch.matmul(scores, v)
     return output
+
 
 class RelativeMultiHeadAttention(nn.Module):
 
@@ -57,7 +58,7 @@ class RelativeMultiHeadAttention(nn.Module):
         rel_pos = self.w.unfold(0, self.length, 1).to(self.device)
 
         # calculate attention using function we will define next
-        scores = self._attention(q, k, v, self.d_k, rel_pos, self.dropout)
+        scores = attention(q, k, v, self.d_k, rel_pos, self.dropout)
         # concatenate heads and put through final linear layer
         concat = scores.transpose(1, 2).contiguous().view(bs, -1, self.d_model)
         output = self.dropout(self.out(concat))

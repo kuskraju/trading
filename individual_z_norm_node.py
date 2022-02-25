@@ -1,34 +1,38 @@
-from abstract_data_sets import AbstractDataSets
+from abstract_data_sets import AbstractDataSet
 import numpy
 
 
-class IndividualZNormNode(AbstractDataSets):
-    def __init__(self, subtree: AbstractDataSets):
+class IndividualZNormNode(AbstractDataSet):
+    def __init__(self, subtree: AbstractDataSet):
         super(IndividualZNormNode, self).__init__(subtree)
         self._copy_target(subtree)
-        self._manage_offset_and_variable_length(0, subtree)
-        self.train = numpy.full(subtree.train.shape, None, dtype=numpy.float64) if subtree.train_sequences_count() > 0 else None
-        self.test = numpy.full(subtree.test.shape, None, dtype=numpy.float64) if subtree.test_sequences_count() > 0 else None
-
-        self._normalize_single_sequence(subtree.train, self.train, "train", subtree.train_sequences_count(), subtree.features_count())
-        self._normalize_single_sequence(subtree.test, self.test, "test", subtree.test_sequences_count(), subtree.features_count())
+        self.train = numpy.full(subtree.train.shape, None, dtype=numpy.float64)
+        self.test = numpy.full(subtree.test.shape, None, dtype=numpy.float64)
+        self._normalize_single_sequence(subtree.train, self.train, subtree.train_sequences_count(),
+                                        subtree.features_count())
+        self._normalize_single_sequence(subtree.test, self.test, subtree.test_sequences_count(),
+                                        subtree.features_count())
 
         self.node_name = "%s_ind-znorm" % subtree.node_name
-        self.print("Individual Z-Norm")
         pass
 
-    def _normalize_single_sequence(self, source_set, target_set, set_name, seq_count, features_count):
-        epsilon = 1e-6
+    @staticmethod
+    def _normalize_single_sequence(source_set, target_set, seq_count, features_count):
+        epsilon = 1e-7
 
         for seq in range(seq_count):
-            mean = numpy.mean(source_set[seq, :self.get_effective_sequence_length(set_name, seq), :], axis=0)
-            sd = numpy.std(source_set[seq, :self.get_effective_sequence_length(set_name, seq), :], axis=0)
-
+            mean = numpy.mean(source_set[seq], axis=0)
+            sd = numpy.std(source_set[seq], axis=0)
             if (sd > epsilon).all():
-                target_set[seq, :self.get_effective_sequence_length(set_name, seq), :] = (source_set[seq, :self.get_effective_sequence_length(set_name, seq), :] - mean) / sd
+                target_set[seq] = (source_set[seq] - mean) / sd
             else:
                 for f in range(features_count):
                     if sd[f] > epsilon:
-                        target_set[seq, :self.get_effective_sequence_length(set_name, seq), f] = (source_set[seq, :self.get_effective_sequence_length(set_name, seq), f] - mean[f]) / sd[f]
+                        target_set[seq] = (source_set[seq] - mean[f]) / sd[f]
                     else:
-                        target_set[seq, :self.get_effective_sequence_length(set_name, seq), f] = numpy.zeros(self.get_effective_sequence_length(set_name, seq))
+                        raise FloatingPointError
+
+    def _copy_target(self, subtree):
+        self.target_train = subtree.target_train
+        self.target_test = subtree.target_test
+        self.available_classes_count = subtree.available_classes_count

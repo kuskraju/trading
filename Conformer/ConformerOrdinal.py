@@ -22,7 +22,7 @@ class Encoder(nn.Module):
 
     def forward(self, src):
         src = self.dropout(self.embed(src))
-        for i in range(self.N):
+        for i in range(self.n):
             src = self.layers[i](src)
         return self.norm(src)
 
