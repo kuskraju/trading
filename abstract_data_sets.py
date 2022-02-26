@@ -30,7 +30,6 @@ class AbstractDataSet:
         self.available_classes_count = 0
         self.node_name = ""
         self.future_range = None
-        self.sequence_length = None
         self.quantile = None
         self.subtree = subtree
 
@@ -54,6 +53,7 @@ class AbstractDataSet:
 
     def get_config(self):
         return {
+            "name": self.node_name,
             "quantile": self.quantile,
             "sequence_length": self.sequence_length,
             "future_range": self.future_range

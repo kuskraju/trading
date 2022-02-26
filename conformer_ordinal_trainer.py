@@ -43,7 +43,7 @@ class ConformerOrdinalTrainer:
             self.model_config["heads"],
             self.model_config["dropout"],
             self.data_sets.features_count(),
-            self.data_sets.sequence_length,
+            self.data_sets.sequence_length(),
             self.class_count
         )
 
@@ -74,7 +74,7 @@ class ConformerOrdinalTrainer:
         self.train_loader, self.test_loader = self._get_data_loaders()
         for epoch_no in range(epoch_count):
             self._train_epoch(epoch_no)
-            self._test_model()
+            self._test_model(epoch_no)
 
     def _train_epoch(self, epoch_no):
         self.gradient_loss = 0.0
@@ -142,8 +142,8 @@ class ConformerOrdinalTrainer:
         pass
 
     @torch.no_grad()
-    def _test_model(self):
-        self._eval_model(self.test_loader, "test")
+    def _test_model(self, epoch_no):
+        self._eval_model(self.test_loader, "test", epoch_no)
 
     def train_model(self, epoch_count, name=""):
         self.epoch_register = {}

@@ -15,6 +15,12 @@ binance_api_secret = os.environ.get("BINANCE_API_SECRET")
 
 client = Client(binance_api_key, binance_api_secret)
 
+'''
+exchange_info = client.get_exchange_info()
+for s in exchange_info['symbols']:
+    print(s['symbol'])
+'''
+
 
 def target(last_close, future_ohlc, past_ohlc, quantile):
     maxes = []
@@ -32,7 +38,7 @@ def target(last_close, future_ohlc, past_ohlc, quantile):
     up = (changes > pos_tau).any(axis=1)
     down = (changes < neg_tau).any(axis=1)
     cha = np.stack([up, down]).any(axis=0)
-    idx = np.where(cha is True)[0] if cha.any() else -1
+    idx = np.where(cha == True)[0][0] if cha.any() else -1
 
     if idx == -1:
         return 1
@@ -64,6 +70,7 @@ def read_financial_leaf_sliding_window(dataset_name, interval, train_date_from, 
     leaf.future_range = future_range
     leaf.sequence_length = sequence_length
     leaf.quantile = quantile
+    leaf = IndividualZNormNode(leaf)
     return leaf, leaf.available_classes_count
 
 
@@ -76,7 +83,7 @@ def extract_sequence_set_and_targets(dataset_name, interval, date_from, date_to,
     ohlcv = pd.DataFrame(get_ohlc(dataset_name, interval, date_from, date_to), dtype=float).iloc[:, 1:6]
     ohlcv.columns = ["open", "high", "low", "close", "volume"]
     ohlcv = wrap(ohlcv)
-    features = ['rsi', 'close_7_smma', 'wt2', 'trix', 'wr']
+    features = ['close_7_smma', 'wt2', 'trix', 'wr']
     for f in features:
         ohlcv[f] = ohlcv.get(f)
     ohlcv.dropna(inplace=True)

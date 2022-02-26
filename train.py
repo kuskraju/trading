@@ -26,7 +26,7 @@ Task.set_credentials(web_host=web_server,
 
 trainer_config = {
     "optimizer_step_at_each_batch": False,
-    "initial_learning_rate": 0.000004,
+    "initial_learning_rate": 0.0001,
     "batch_size": 64,
 }
 
@@ -39,12 +39,12 @@ model_config = {
 }
 
 sequence_length = 13
-quantile = 0.2
 future_range = 5
+quantile = 0.2
 
-epochs = 180
+epochs = 200
 
-dataset_names = ["ETHBTC"]
+dataset_names = ["BTCUSDT"]
 
 interval = Client.KLINE_INTERVAL_1DAY
 
@@ -52,6 +52,10 @@ cont = False
 done_num = 0
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+params = [13]
+
+xlabels = [str(x) for x in params]
 
 steps = 0
 if cont:
@@ -64,14 +68,14 @@ else:
                      task_name="Summary",
                      reuse_last_task_id=False)
     task.close()
-    good_count = np.zeros((len(dataset_names)))
-    all_played = np.zeros((len(dataset_names)))
+    good_count = np.zeros((len(dataset_names), len(params)))
+    all_played = np.zeros((len(dataset_names), len(params)))
 
-for yit, year in enumerate(range(2018, 2020, 1)):
+for yit, year in enumerate(range(2018, 2019, 1)):
     train_date_from = datetime(year, 1, 1).strftime("%d %b, %Y")
-    train_date_to = datetime(year + 1, 12, 30).strftime("%d %b, %Y")
-    test_date_from = datetime(year + 2, 1, 1).strftime("%d %b, %Y")
-    test_date_to = datetime(year + 2, 12, 30).strftime("%d %b, %Y")
+    train_date_to = datetime(year + 2, 12, 30).strftime("%d %b, %Y")
+    test_date_from = datetime(year + 3, 1, 1).strftime("%d %b, %Y")
+    test_date_to = datetime(year + 3, 12, 30).strftime("%d %b, %Y")
     clear_dict = {
         "train_date_from": train_date_from,
         "train_date_to": train_date_to,
@@ -95,44 +99,47 @@ for yit, year in enumerate(range(2018, 2020, 1)):
 
         clear_dict.update(node.get_config())
 
-        steps += 1
-        if cont and steps <= done_num:
-            continue
+        for paramId, param in enumerate(params):
+            trainer_config["sequence_length"] = param
 
-        trainer = ConformerOrdinalTrainer(node, trainer_config, model_config, class_count,
-                                          device, "ConformerOrdinal", get_triple_barrier_statistics())
+            steps += 1
+            if cont and steps <= done_num:
+                continue
 
-        task = Task.init(project_name=project_name,
-                         task_name=node.node_name,
-                         reuse_last_task_id=False)
+            trainer = ConformerOrdinalTrainer(node, trainer_config, model_config, class_count,
+                                              device, "ConformerOrdinal", get_triple_barrier_statistics())
 
-        clear_dict.update(trainer.model_config)
-        clear_dict.update(trainer.trainer_config)
+            task = Task.init(project_name=project_name,
+                             task_name=node.node_name,
+                             reuse_last_task_id=False)
 
-        trainer.logger = task.get_logger()
-        trainer.plot_hist_classes()
-        task.connect(clear_dict)
+            clear_dict.update(trainer.model_config)
+            clear_dict.update(trainer.trainer_config)
 
-        trainer.train_model(epochs)
-        good_count[di] += trainer.register["test_good_count"][-1]
-        all_played[di] += trainer.register["test_all_played"][-1]
+            trainer.logger = task.get_logger()
+            trainer.plot_hist_classes()
+            task.connect(clear_dict)
 
-        task.close()
+            trainer.train_model(epochs)
+            good_count[di, paramId] += trainer.register["test_good_count"][-1]
+            all_played[di, paramId] += trainer.register["test_all_played"][-1]
 
-        task_sum = Task.get_task(project_name=project_name,
-                                 task_name="Summary")
+            task.close()
 
-        task_sum.upload_artifact(name='good_count', artifact_object=good_count)
-        task_sum.upload_artifact(name='all_played', artifact_object=all_played)
+            task_sum = Task.get_task(project_name=project_name,
+                                     task_name="Summary")
 
-        logger_sum = task_sum.get_logger()
-        val = trainer.register["test_good_count"][-1] / trainer.register["test_all_played"][-1] if \
-            trainer.register["test_all_played"][-1] > 0 else 0
-        logger_sum.report_scalar(title="Play_Accuracy_{}".format(dataset_name),
-                                 series="play_acc", iteration=yit,
-                                 value=val)
+            task_sum.upload_artifact(name='good_count', artifact_object=good_count)
+            task_sum.upload_artifact(name='all_played', artifact_object=all_played)
 
-        task_sum.close()
+            logger_sum = task_sum.get_logger()
+            val = trainer.register["test_good_count"][-1] / trainer.register["test_all_played"][-1] if \
+                trainer.register["test_all_played"][-1] > 0 else 0
+            logger_sum.report_scalar(title="Play_Accuracy_{}".format(dataset_name),
+                                     series=str(param), iteration=yit,
+                                     value=val)
+
+            task_sum.close()
 
 task_sum = Task.get_task(project_name=project_name,
                          task_name="Summary")
@@ -141,12 +148,14 @@ logger_sum = task_sum.get_logger()
 logger_sum.report_histogram(
     "Play accuracy",
     "play acc",
-    values=good_count / all_played if all_played > 0 else 0,
+    xlabels=xlabels,
+    values=good_count / all_played,
     labels=dataset_names
 )
 logger_sum.report_histogram(
     "Population size",
     "played",
+    xlabels=xlabels,
     values=all_played,
     labels=dataset_names
 )

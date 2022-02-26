@@ -5,7 +5,7 @@ import torch.nn.functional as f
 
 from Conformer.ConformerEncoderLayer import ConformerEncoderLayer
 from Conformer.RelativeMultiHeadAttention import get_clones
-from initilizers import linear_init_with_he_normal, linear_init_with_lecun_normal
+from initilizers import linear_init_with_he_normal, linear_init_with_lecun_normal, linear_init_with_zeros
 
 
 class Encoder(nn.Module):
@@ -42,7 +42,7 @@ class ConformerOrdinal(nn.Module):
             nn.Linear(self.d_model * length, self.d4 * length)).to(device)
         self.out2 = linear_init_with_he_normal(
             nn.Linear(self.d4 * length, math.floor(math.sqrt(self.d4 * length * classes)))).to(self.device)
-        self.out3 = linear_init_with_lecun_normal(
+        self.out3 = linear_init_with_zeros(
             nn.Linear(math.floor(math.sqrt(self.d4 * length * classes)), 1)).to(device)
         self.dropout = nn.Dropout(dropout)
 
@@ -55,8 +55,9 @@ class ConformerOrdinal(nn.Module):
         x = x.view(x.shape[0], -1)
         x = f.relu(self.out1(x))
         x = f.relu(self.out2(x))
-        x = (self.dropout(self.out3(x)) * 2 * self.classes)
-        x = torch.hstack((torch.sigmoid(self.tresholds.view(1, -1).repeat(x.shape[0], 1) - x), torch.ones(x.shape[0], 1).to(self.device)))
+        x = self.out3(x)
+        x = torch.hstack((torch.sigmoid(self.tresholds.view(1, -1).repeat(x.shape[0], 1) - x),
+                          torch.ones(x.shape[0], 1).to(self.device)))
         x_rest = x[..., 1:] - x[..., :-1]
         x = torch.hstack((x[..., 0].view(-1, 1), x_rest))
         return x
