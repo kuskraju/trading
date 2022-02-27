@@ -9,8 +9,7 @@ from abstract_data_sets import AbstractDataSet
 
 
 class ConformerOrdinalTrainer:
-    def __init__(self, data_sets_tree: AbstractDataSet, trainer_config, model_config, class_count, device, model_name,
-                 statistics):
+    def __init__(self, data_sets_tree: AbstractDataSet, trainer_config, model_config, class_count, device, statistics):
         self.data_sets = data_sets_tree
         self.trainer_config = trainer_config
         self.model_config = model_config
@@ -19,7 +18,6 @@ class ConformerOrdinalTrainer:
         self.batch_size = trainer_config["batch_size"]
         self.class_count = class_count
         self.device = device
-        self.model_name = model_name
         self.statistics = statistics
         self.logger = None
         self.model = None
@@ -28,6 +26,9 @@ class ConformerOrdinalTrainer:
     def _get_data_loaders(self):
         return DataLoader(self.data_sets.get_wrapped_train(), batch_size=self.batch_size, shuffle=True),\
                DataLoader(self.data_sets.get_wrapped_test(), batch_size=self.batch_size)
+
+    def _get_test_data_loader(self):
+        return DataLoader(self.data_sets.get_wrapped_test(), batch_size=self.batch_size)
 
     def _get_optimiser(self, model):
         return optim.Adam(model.parameters(), lr=self.initial_learning_rate)
@@ -143,7 +144,8 @@ class ConformerOrdinalTrainer:
 
     @torch.no_grad()
     def _test_model(self, epoch_no):
-        self._eval_model(self.test_loader, "test", epoch_no)
+        if not numpy.isnan(self.data_sets.test):
+            self._eval_model(self.test_loader, "test", epoch_no)
 
     def train_model(self, epoch_count, name=""):
         self.epoch_register = {}

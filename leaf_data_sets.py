@@ -20,7 +20,7 @@ class LeafDataSet(AbstractDataSet):
         print("Leaf node '%s' created" % self.node_name)
 
     def features_count(self):
-        return numpy.size(self.train, axis=2)
+        return numpy.size(self.test, axis=2) if not numpy.isnan(self.test).any() else numpy.size(self.train, axis=2)
 
     def sequence_length(self):
         return numpy.size(self.train, axis=1)

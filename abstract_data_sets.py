@@ -34,10 +34,10 @@ class AbstractDataSet:
         self.subtree = subtree
 
     def features_count(self):
-        return numpy.size(self.train, axis=2)
+        return numpy.size(self.test, axis=2) if not numpy.isnan(self.test).any() else numpy.size(self.train, axis=2)
 
     def sequence_length(self):
-        return numpy.size(self.train, axis=1)
+        return numpy.size(self.test, axis=1) if not numpy.isnan(self.test).any() else numpy.size(self.train, axis=1)
 
     def train_sequences_count(self):
         return numpy.size(self.train, axis=0)
@@ -50,11 +50,3 @@ class AbstractDataSet:
 
     def get_wrapped_test(self):
         return TorchDatasetWrapper(self.test, self.target_test)
-
-    def get_config(self):
-        return {
-            "name": self.node_name,
-            "quantile": self.quantile,
-            "sequence_length": self.sequence_length,
-            "future_range": self.future_range
-        }

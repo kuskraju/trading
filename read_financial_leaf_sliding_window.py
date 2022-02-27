@@ -14,12 +14,84 @@ binance_api_key = os.environ.get("BINANCE_API_KEY")
 binance_api_secret = os.environ.get("BINANCE_API_SECRET")
 
 client = Client(binance_api_key, binance_api_secret)
+# client.API_URL = 'https://testnet.binance.vision/api'
+# print(client.get_account())
+# BINANCE_API_KEY=E9Ae9rZu33jaLF2BaHSETXXNTLOM7oxWntVQX8UNjrseoL18AKyNOBYfiZslsZYb
+# BINANCE_SECRET_KEY=x9fVinIlaWV2dhhedrP6mhuIwjtCfLIrtNdRv2lYfa3oydlnOd6ArgwfqDgRhGHT
 
 '''
 exchange_info = client.get_exchange_info()
 for s in exchange_info['symbols']:
     print(s['symbol'])
 '''
+
+
+def read_financial_leaf_sliding_window(data_config, time_config=None):
+    high, low = None, None
+    train, target_train, test, target_test = None, None, None, None
+    if time_config is None:
+        test, _, high, low = extract_sequence_set_and_targets(data_config["dataset_name"],
+                                                                        data_config["interval"],
+                                                                        data_config["future_range"],
+                                                                        data_config["sequence_length"],
+                                                                        data_config["quantile"])
+    else:
+        train, target_train, _, _ = extract_sequence_set_and_targets(data_config["dataset_name"],
+                                                                     data_config["interval"],
+                                                                     data_config["future_range"],
+                                                                     data_config["sequence_length"],
+                                                                     data_config["quantile"],
+                                                                     date_from=time_config["train_date_from"],
+                                                                     date_to=time_config["train_date_to"],
+                                                                     )
+        if "test_date_from" in data_config.keys():
+            test, target_test, _, _ = extract_sequence_set_and_targets(data_config["dataset_name"],
+                                                                       data_config["interval"],
+                                                                       data_config["future_range"],
+                                                                       data_config["sequence_length"],
+                                                                       data_config["quantile"],
+                                                                       date_from=time_config["test_date_from"],
+                                                                       date_to=time_config["test_date_to"],
+                                                                       )
+    leaf = LeafDataSet(train, test, target_train, target_test, data_config["dataset_name"])
+    leaf = IndividualZNormNode(leaf)
+    return leaf, leaf.available_classes_count, high, low
+
+
+def extract_sequence_set_and_targets(dataset_name, interval, future_range, sequence_length, quantile,
+                                     date_from=None, date_to=None):
+    api_data = get_ohlc(dataset_name, interval, date_from=date_from, date_to=date_to, sequence_length=sequence_length)
+    ohlcv = pd.DataFrame(api_data, dtype=float).iloc[:, 1:6]
+    ohlcv.columns = ["open", "high", "low", "close", "volume"]
+    ohlcv = wrap(ohlcv)
+    features = ['close_7_smma', 'wt2', 'trix', 'wr']
+    for f in features:
+        ohlcv[f] = ohlcv.get(f)
+    ohlcv.dropna(inplace=True)
+    ohlcv = unwrap(ohlcv).to_numpy()
+    feature_count = np.size(ohlcv, axis=1)
+    x, y, high, low = None, None, None, None
+    if date_from is not None:
+        sliding_windows_count = ohlcv.shape[0] - sequence_length - future_range + 1
+        x = np.zeros(shape=(sliding_windows_count, sequence_length, feature_count))
+        y = np.zeros(shape=sliding_windows_count)
+        for i in range(sliding_windows_count):
+            x[i, :, :] = ohlcv[i:i + sequence_length, :]
+            y[i], _, _ = target(ohlcv[i + sequence_length - 1, 3],
+                                           ohlcv[i + sequence_length:i + sequence_length + future_range, :3],
+                                           ohlcv[i:i + sequence_length, :3],
+                                           quantile)
+    else:
+        x = np.zeros(shape=(1, sequence_length, feature_count))
+        x[0, :, :] = ohlcv[:sequence_length, :]
+        _, high, low = target(ohlcv[0, 3], np.zeros((future_range, 1)), ohlcv[:sequence_length, :3], quantile)
+    return x, y, high, low
+
+
+def get_ohlc(dataset_name, interval, date_from=None, date_to=None, sequence_length=None):
+    return client.get_historical_klines(dataset_name, interval, date_from, date_to) \
+        if date_from is not None else client.get_historical_klines(dataset_name, interval, "1 day ago UTC",
+                                                                   limit=sequence_length)
 
 
 def target(last_close, future_ohlc, past_ohlc, quantile):
@@ -41,61 +113,17 @@ def target(last_close, future_ohlc, past_ohlc, quantile):
     idx = np.where(cha == True)[0][0] if cha.any() else -1
 
     if idx == -1:
-        return 1
+        return 1, last_close * (1 + pos_tau), last_close * (1 + neg_tau)
     elif up[idx] and down[idx]:
         if changes[idx][0] > pos_tau:
-            return 2
+            return 2, last_close * (1 + pos_tau), last_close * (1 + neg_tau)
         elif changes[idx][0] < neg_tau:
-            return 0
+            return 0, last_close * (1 + pos_tau), last_close * (1 + neg_tau)
         else:
-            return 1
+            return 1, last_close * (1 + pos_tau), last_close * (1 + neg_tau)
     elif up[idx]:
-        return 2
+        return 2, last_close * (1 + pos_tau), last_close * (1 + neg_tau)
     elif down[idx]:
-        return 0
+        return 0, last_close * (1 + pos_tau), last_close * (1 + neg_tau)
     else:
-        return 1
-
-
-def read_financial_leaf_sliding_window(dataset_name, interval, train_date_from, train_date_to, test_date_from,
-                                       test_date_to, sequence_length, quantile, future_range):
-    train, target_train = extract_sequence_set_and_targets(dataset_name, interval, train_date_from, train_date_to,
-                                                           future_range,
-                                                           sequence_length, quantile)
-    test, target_test = extract_sequence_set_and_targets(dataset_name, interval, test_date_from, test_date_to,
-                                                         future_range,
-                                                         sequence_length, quantile)
-    leaf = LeafDataSet(train, test, target_train, target_test, dataset_name)
-    leaf.interval = interval
-    leaf.future_range = future_range
-    leaf.sequence_length = sequence_length
-    leaf.quantile = quantile
-    leaf = IndividualZNormNode(leaf)
-    return leaf, leaf.available_classes_count
-
-
-def get_ohlc(dataset_name, interval, date_from, date_to):
-    return client.get_historical_klines(dataset_name, interval, date_from, date_to)
-
-
-def extract_sequence_set_and_targets(dataset_name, interval, date_from, date_to, future_range, sequence_length,
-                                     quantile):
-    ohlcv = pd.DataFrame(get_ohlc(dataset_name, interval, date_from, date_to), dtype=float).iloc[:, 1:6]
-    ohlcv.columns = ["open", "high", "low", "close", "volume"]
-    ohlcv = wrap(ohlcv)
-    features = ['close_7_smma', 'wt2', 'trix', 'wr']
-    for f in features:
-        ohlcv[f] = ohlcv.get(f)
-    ohlcv.dropna(inplace=True)
-    ohlcv = unwrap(ohlcv).to_numpy()
-    sliding_windows_count = ohlcv.shape[0] - sequence_length - future_range + 1
-    feature_count = np.size(ohlcv, axis=1)
-    x = np.zeros(shape=(sliding_windows_count, sequence_length, feature_count))
-    y = np.zeros(shape=(sliding_windows_count))
-    for i in range(sliding_windows_count):
-        x[i, :, :] = ohlcv[i:i + sequence_length, :]
-        y[i] = target(ohlcv[i + sequence_length - 1, 3],
-                      ohlcv[i + sequence_length:i + sequence_length + future_range, :3],
-                      ohlcv[i:i + sequence_length, :3],
-                      quantile)
-    return x, y
+        return 1, last_close * (1 + pos_tau), last_close * (1 + neg_tau)

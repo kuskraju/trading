@@ -8,17 +8,19 @@ class IndividualZNormNode(AbstractDataSet):
         self._copy_target(subtree)
         self.train = numpy.full(subtree.train.shape, None, dtype=numpy.float64)
         self.test = numpy.full(subtree.test.shape, None, dtype=numpy.float64)
-        self._normalize_single_sequence(subtree.train, self.train, subtree.train_sequences_count(),
-                                        subtree.features_count())
-        self._normalize_single_sequence(subtree.test, self.test, subtree.test_sequences_count(),
-                                        subtree.features_count())
+        if not numpy.isnan(subtree.train).any():
+            self._normalize_single_sequence(subtree.train, self.train, subtree.train_sequences_count(),
+                                            subtree.features_count())
+        if not numpy.isnan(subtree.test).any():
+            self._normalize_single_sequence(subtree.test, self.test, subtree.test_sequences_count(),
+                                            subtree.features_count())
 
         self.node_name = "%s_ind-znorm" % subtree.node_name
         pass
 
     @staticmethod
     def _normalize_single_sequence(source_set, target_set, seq_count, features_count):
-        epsilon = 1e-7
+        epsilon = 1e-16
 
         for seq in range(seq_count):
             mean = numpy.mean(source_set[seq], axis=0)
