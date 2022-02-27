@@ -5,15 +5,10 @@ from dotenv import load_dotenv
 import os
 from binance.client import Client
 
+from constants import client
 from individual_z_norm_node import IndividualZNormNode
 from leaf_data_sets import LeafDataSet
 
-load_dotenv()
-
-binance_api_key = os.environ.get("BINANCE_API_KEY")
-binance_api_secret = os.environ.get("BINANCE_API_SECRET")
-
-client = Client(binance_api_key, binance_api_secret)
 # client.API_URL = 'https://testnet.binance.vision/api'
 # print(client.get_account())
 # BINANCE_API_KEY=E9Ae9rZu33jaLF2BaHSETXXNTLOM7oxWntVQX8UNjrseoL18AKyNOBYfiZslsZYb

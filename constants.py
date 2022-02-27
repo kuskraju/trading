@@ -44,3 +44,11 @@ api_server = 'https://api.community.clear.ml'
 files_server = 'https://files.community.clear.ml'
 access_key = os.environ.get("CLEARML_ACCESS")
 secret_key = os.environ.get("CLEARML_SECRET")
+
+binance_api_key = os.environ.get("BINANCE_API_KEY")
+binance_api_secret = os.environ.get("BINANCE_API_SECRET")
+
+client = Client(binance_api_key, binance_api_secret)
+
+
+quantity = 100
