@@ -3,9 +3,9 @@ import torch
 from torch import nn
 import torch.nn.functional as f
 
-from Conformer.ConformerEncoderLayer import ConformerEncoderLayer
-from Conformer.RelativeMultiHeadAttention import get_clones
-from initilizers import linear_init_with_he_normal, linear_init_with_lecun_normal, linear_init_with_zeros
+from hidden_module.Conformer.ConformerEncoderLayer import ConformerEncoderLayer
+from hidden_module.Conformer.RelativeMultiHeadAttention import get_clones
+from hidden_module.initilizers import linear_init_with_he_normal, linear_init_with_zeros
 
 
 class Encoder(nn.Module):

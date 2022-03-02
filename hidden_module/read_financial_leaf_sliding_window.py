@@ -1,24 +1,10 @@
 import numpy as np
 import pandas as pd
 from stockstats import wrap, unwrap
-from dotenv import load_dotenv
-import os
-from binance.client import Client
 
-from constants import client
-from individual_z_norm_node import IndividualZNormNode
-from leaf_data_sets import LeafDataSet
-
-# client.API_URL = 'https://testnet.binance.vision/api'
-# print(client.get_account())
-# BINANCE_API_KEY=E9Ae9rZu33jaLF2BaHSETXXNTLOM7oxWntVQX8UNjrseoL18AKyNOBYfiZslsZYb
-# BINANCE_SECRET_KEY=x9fVinIlaWV2dhhedrP6mhuIwjtCfLIrtNdRv2lYfa3oydlnOd6ArgwfqDgRhGHT
-
-'''
-exchange_info = client.get_exchange_info()
-for s in exchange_info['symbols']:
-    print(s['symbol'])
-'''
+from hidden_module.constants import client
+from hidden_module.individual_z_norm_node import IndividualZNormNode
+from hidden_module.leaf_data_sets import LeafDataSet
 
 
 def read_financial_leaf_sliding_window(data_config, time_config=None):
@@ -26,10 +12,10 @@ def read_financial_leaf_sliding_window(data_config, time_config=None):
     train, target_train, test, target_test = None, None, None, None
     if time_config is None:
         test, _, high, low = extract_sequence_set_and_targets(data_config["dataset_name"],
-                                                                        data_config["interval"],
-                                                                        data_config["future_range"],
-                                                                        data_config["sequence_length"],
-                                                                        data_config["quantile"])
+                                                              data_config["interval"],
+                                                              data_config["future_range"],
+                                                              data_config["sequence_length"],
+                                                              data_config["quantile"])
     else:
         train, target_train, _, _ = extract_sequence_set_and_targets(data_config["dataset_name"],
                                                                      data_config["interval"],
@@ -39,7 +25,7 @@ def read_financial_leaf_sliding_window(data_config, time_config=None):
                                                                      date_from=time_config["train_date_from"],
                                                                      date_to=time_config["train_date_to"],
                                                                      )
-        if "test_date_from" in data_config.keys():
+        if "test_date_from" in time_config.keys():
             test, target_test, _, _ = extract_sequence_set_and_targets(data_config["dataset_name"],
                                                                        data_config["interval"],
                                                                        data_config["future_range"],
@@ -68,14 +54,15 @@ def extract_sequence_set_and_targets(dataset_name, interval, future_range, seque
     x, y, high, low = None, None, None, None
     if date_from is not None:
         sliding_windows_count = ohlcv.shape[0] - sequence_length - future_range + 1
+        print(sliding_windows_count, sequence_length, feature_count)
         x = np.zeros(shape=(sliding_windows_count, sequence_length, feature_count))
         y = np.zeros(shape=sliding_windows_count)
         for i in range(sliding_windows_count):
             x[i, :, :] = ohlcv[i:i + sequence_length, :]
             y[i], _, _ = target(ohlcv[i + sequence_length - 1, 3],
-                                           ohlcv[i + sequence_length:i + sequence_length + future_range, :3],
-                                           ohlcv[i:i + sequence_length, :3],
-                                           quantile)
+                                ohlcv[i + sequence_length:i + sequence_length + future_range, :3],
+                                ohlcv[i:i + sequence_length, :3],
+                                quantile)
     else:
         x = np.zeros(shape=(1, sequence_length, feature_count))
         x[0, :, :] = ohlcv[:sequence_length, :]
@@ -84,9 +71,9 @@ def extract_sequence_set_and_targets(dataset_name, interval, future_range, seque
 
 
 def get_ohlc(dataset_name, interval, date_from=None, date_to=None, sequence_length=None):
-    return client.get_historical_klines(dataset_name, interval, date_from, date_to) \
-        if date_from is not None else client.get_historical_klines(dataset_name, interval, "1 day ago UTC",
-                                                                   limit=sequence_length)
+    return client.futures_historical_klines(dataset_name, interval, date_from, date_to) \
+        if date_from is not None else client.futures_historical_klines(dataset_name, interval, "1 hour ago UTC",
+                                                                       limit=sequence_length)
 
 
 def target(last_close, future_ohlc, past_ohlc, quantile):

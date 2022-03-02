@@ -1,11 +1,8 @@
-import random
-
-import torch
 import torch.nn.functional as f
 from torch import nn
 
-from Conformer.ConformerFeedForward import ConformerFeedForward
-from Conformer.RelativeMultiHeadAttention import RelativeMultiHeadAttention
+from hidden_module.Conformer.ConformerFeedForward import ConformerFeedForward
+from hidden_module.Conformer.RelativeMultiHeadAttention import RelativeMultiHeadAttention
 
 
 class ConformerEncoderLayer(nn.Module):

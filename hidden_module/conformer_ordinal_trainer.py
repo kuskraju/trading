@@ -4,8 +4,8 @@ import torch.nn as nn
 from torch import optim
 from torch.utils.data import DataLoader
 
-from Conformer.ConformerOrdinal import ConformerOrdinal
-from abstract_data_sets import AbstractDataSet
+from hidden_module.Conformer.ConformerOrdinal import ConformerOrdinal
+from hidden_module.abstract_data_sets import AbstractDataSet
 
 
 class ConformerOrdinalTrainer:
@@ -20,7 +20,16 @@ class ConformerOrdinalTrainer:
         self.device = device
         self.statistics = statistics
         self.logger = None
-        self.model = None
+        self.model = ConformerOrdinal(
+            self.device,
+            self.model_config["d_model"],
+            self.model_config["n"],
+            self.model_config["heads"],
+            self.model_config["dropout"],
+            self.data_sets.features_count(),
+            self.data_sets.sequence_length(),
+            self.class_count
+        )
         pass
 
     def _get_data_loaders(self):
@@ -35,18 +44,6 @@ class ConformerOrdinalTrainer:
 
     def _get_scheduler(self, optimizer):
         return optim.lr_scheduler.ExponentialLR(optimizer, 0.99)
-
-    def _get_model(self):
-        return ConformerOrdinal(
-            self.device,
-            self.model_config["d_model"],
-            self.model_config["n"],
-            self.model_config["heads"],
-            self.model_config["dropout"],
-            self.data_sets.features_count(),
-            self.data_sets.sequence_length(),
-            self.class_count
-        )
 
     def _get_loss_function(self):
         return nn.CrossEntropyLoss(reduction='sum')
@@ -68,7 +65,6 @@ class ConformerOrdinalTrainer:
 
     def _train_model_single_run(self, epoch_count, name):
         print(name + " starting training: %d epochs" % epoch_count)
-        self.model = self._get_model()
         self.optimizer = self._get_optimiser(self.model)
         self.scheduler = self._get_scheduler(self.optimizer)
         self.loss_function = self._get_loss_function()
@@ -144,7 +140,7 @@ class ConformerOrdinalTrainer:
 
     @torch.no_grad()
     def _test_model(self, epoch_no):
-        if not numpy.isnan(self.data_sets.test):
+        if not numpy.isnan(self.data_sets.test).any():
             self._eval_model(self.test_loader, "test", epoch_no)
 
     def train_model(self, epoch_count, name=""):

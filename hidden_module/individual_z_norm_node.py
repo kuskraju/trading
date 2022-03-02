@@ -1,4 +1,4 @@
-from abstract_data_sets import AbstractDataSet
+from hidden_module.abstract_data_sets import AbstractDataSet
 import numpy
 
 
