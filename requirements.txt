@@ -27,3 +27,4 @@ python-binance
 torch~=1.10.2
 pandas~=1.4.1
 stockstats~=0.4.1
+trio~=0.20.0

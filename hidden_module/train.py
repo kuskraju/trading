@@ -1,5 +1,6 @@
 from datetime import datetime
 from clearml import Task
+from dateutil.relativedelta import relativedelta
 
 from hidden_module.conformer_ordinal_trainer import ConformerOrdinalTrainer
 from hidden_module.constants import data_config, web_server, api_server, files_server, access_key, secret_key, \
@@ -33,15 +34,14 @@ def train():
             "test_date_to": datetime(2022, 1, mit + 3).strftime("%d %b, %Y")
         }
 
-        node, class_count, _, _ = read_financial_leaf_sliding_window(
+        node, class_count, high, low = read_financial_leaf_sliding_window(
             data_config=data_config,
             time_config=time_config
         )
 
         clear_dict = {**data_config, **time_config, **trainer_config, **model_config}
-
         trainer = ConformerOrdinalTrainer(node, trainer_config, model_config, class_count, device,
-                                          get_triple_barrier_statistics())
+                                          get_triple_barrier_statistics(), high, low)
 
         task = Task.init(project_name=project_name,
                          task_name=node.node_name,
@@ -89,3 +89,33 @@ def train():
     )
 
     task_sum.close()
+
+
+def train_latest():
+    date = datetime.now()
+    time_config = {
+        "train_date_from": (date - relativedelta(day=1)).strftime("%d %b, %Y"),
+        "train_date_to": date.strftime("%d %b, %Y")
+    }
+
+    node, class_count, _, _ = read_financial_leaf_sliding_window(time_config=time_config,
+                                                                    data_config=data_config)
+
+    trainer = ConformerOrdinalTrainer(node, trainer_config, model_config, class_count, device,
+                                      get_triple_barrier_statistics())
+
+    task = Task.init(project_name=project_name,
+                     task_name=node.node_name,
+                     tags=["latest"],
+                     reuse_last_task_id=False)
+
+    trainer.logger = task.get_logger()
+    trainer.plot_hist_classes()
+    clear_dict = {**data_config, **trainer_config, **model_config}
+
+    task.connect(clear_dict)
+
+    trainer.train_model(epochs)
+
+    task.upload_artifact("model", trainer.model.state_dict())
+    task.close()

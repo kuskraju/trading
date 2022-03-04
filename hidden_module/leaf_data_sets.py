@@ -17,8 +17,6 @@ class LeafDataSet(AbstractDataSet):
         self.available_classes_count = 3
         self.node_name = node_name
 
-        print("Leaf node '%s' created" % self.node_name)
-
     def features_count(self):
         return numpy.size(self.test, axis=2) if not numpy.isnan(self.test).any() else numpy.size(self.train, axis=2)
 

@@ -42,13 +42,13 @@ class ConformerOrdinal(nn.Module):
             nn.Linear(self.d_model * length, self.d4 * length)).to(device)
         self.out2 = linear_init_with_he_normal(
             nn.Linear(self.d4 * length, math.floor(math.sqrt(self.d4 * length * classes)))).to(self.device)
-        self.out3 = linear_init_with_zeros(
-            nn.Linear(math.floor(math.sqrt(self.d4 * length * classes)), 1)).to(device)
+        self.out3 = nn.Linear(math.floor(math.sqrt(self.d4 * length * classes)), 1).to(device)
+        self.out3 = linear_init_with_zeros(self.out3)
         self.dropout = nn.Dropout(dropout)
 
         step = 1 / classes
         self.classes = classes
-        self.tresholds = ((torch.range(step, 1 - step / 2, step, requires_grad=False) - 0.5) * 2 * classes).to(self.device)
+        self.tresholds = ((torch.arange(step, 1 - step / 2, step, requires_grad=False) - 0.5) * 2 * classes).to(self.device)
 
     def forward(self, x):
         x = self.encoder(x)

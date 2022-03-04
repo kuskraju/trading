@@ -1,6 +1,8 @@
+import asyncio
+
 import torch
 from dotenv import load_dotenv
-from binance.client import Client
+from binance.client import Client, AsyncClient
 import os
 
 load_dotenv()
@@ -30,10 +32,10 @@ model_config = {
 
 data_config = {
     "dataset_name": "BTCUSDT",
-    "sequence_length": 13,
+    "sequence_length": 30,
     "future_range": 5,
     "quantile": 0.6,
-    "interval": Client.KLINE_INTERVAL_1MINUTE
+    "interval": Client.KLINE_INTERVAL_5MINUTE
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -50,22 +52,22 @@ binance_api_secret = os.environ.get("BINANCE_API_SECRET")
 test_binance_api_key = os.environ.get("TEST_BINANCE_API_KEY")
 test_binance_api_secret = os.environ.get("TEST_BINANCE_API_SECRET")
 
-client = Client(binance_api_key, binance_api_secret)
-test_client = Client(test_binance_api_key, test_binance_api_secret, testnet=True)
-
 money_to_play = 100
 
-epochs = 130
-
-info = client.futures_exchange_info()
+epochs = 60
 
 pricePrecision = 1
+quantityPrecision = 1
+
+# client = Client(binance_api_key, binance_api_secret)
+client = Client(test_binance_api_key, test_binance_api_secret, testnet=True)
+
+info = client.futures_exchange_info()
 for x in info['symbols']:
     if x['symbol'] == data_config["dataset_name"]:
         pricePrecision = x['pricePrecision']
         break
 
-quantityPrecision = 1
 for x in info['symbols']:
     if x['symbol'] == data_config["dataset_name"]:
         quantityPrecision = x['quantityPrecision']

@@ -9,7 +9,8 @@ from hidden_module.abstract_data_sets import AbstractDataSet
 
 
 class ConformerOrdinalTrainer:
-    def __init__(self, data_sets_tree: AbstractDataSet, trainer_config, model_config, class_count, device, statistics):
+    def __init__(self, data_sets_tree: AbstractDataSet, trainer_config, model_config, class_count, device, statistics,
+                 high, low):
         self.data_sets = data_sets_tree
         self.trainer_config = trainer_config
         self.model_config = model_config
@@ -20,6 +21,8 @@ class ConformerOrdinalTrainer:
         self.device = device
         self.statistics = statistics
         self.logger = None
+        self.high = high
+        self.low = low
         self.model = ConformerOrdinal(
             self.device,
             self.model_config["d_model"],
@@ -101,7 +104,7 @@ class ConformerOrdinalTrainer:
         self._per_epoch_register("train_loss", self.epoch_loss.item())
         classifications = numpy.argmax(predictions, axis=1)
         for key in self.statistics.keys():
-            stat = self.statistics[key](classifications, targets)
+            stat = self.statistics[key](classifications, targets, self.high, self.low)
             self._per_epoch_register("train_%s" % key, stat)
             if stat is not None:
                 self.logger.report_scalar(title=key, series='Train', iteration=epoch_no, value=stat)
@@ -131,7 +134,7 @@ class ConformerOrdinalTrainer:
             classifications = numpy.argmax(predictions, axis=1)
             self._per_epoch_register("%s_loss" % prefix, self.epoch_loss.item())
             for key in self.statistics.keys():
-                stat = self.statistics[key](classifications, targets)
+                stat = self.statistics[key](classifications, targets, self.high, self.low)
                 self._per_epoch_register("%s_%s" % (prefix, key), stat)
 
                 if stat is not None:

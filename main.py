@@ -1,6 +1,10 @@
-from functions import trade, train_latest
-from hidden_module.train import train
+import asyncio
 
-trade()
-# train()
-# train_latest()
+from functions import trade
+from hidden_module.train import train, train_latest
+
+
+if __name__ == "__main__":
+    # asyncio.run(trade())
+    train()
+    # train_latest()
