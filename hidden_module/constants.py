@@ -34,8 +34,8 @@ data_config = {
     "dataset_name": "BTCUSDT",
     "sequence_length": 30,
     "future_range": 5,
-    "quantile": 0.6,
-    "interval": Client.KLINE_INTERVAL_5MINUTE
+    "quantile": 0.3,
+    "interval": Client.KLINE_INTERVAL_1HOUR
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -54,7 +54,7 @@ test_binance_api_secret = os.environ.get("TEST_BINANCE_API_SECRET")
 
 money_to_play = 100
 
-epochs = 60
+epochs = 300
 
 pricePrecision = 1
 quantityPrecision = 1

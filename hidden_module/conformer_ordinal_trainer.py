@@ -2,7 +2,7 @@ import numpy
 import torch
 import torch.nn as nn
 from torch import optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, BatchSampler
 
 from hidden_module.Conformer.ConformerOrdinal import ConformerOrdinal
 from hidden_module.abstract_data_sets import AbstractDataSet
@@ -10,7 +10,7 @@ from hidden_module.abstract_data_sets import AbstractDataSet
 
 class ConformerOrdinalTrainer:
     def __init__(self, data_sets_tree: AbstractDataSet, trainer_config, model_config, class_count, device, statistics,
-                 high, low):
+                 high_train, low_train, high_test, low_test):
         self.data_sets = data_sets_tree
         self.trainer_config = trainer_config
         self.model_config = model_config
@@ -21,8 +21,10 @@ class ConformerOrdinalTrainer:
         self.device = device
         self.statistics = statistics
         self.logger = None
-        self.high = high
-        self.low = low
+        self.high_train = high_train
+        self.low_train = low_train
+        self.high_test = high_test
+        self.low_test = low_test
         self.model = ConformerOrdinal(
             self.device,
             self.model_config["d_model"],
@@ -36,7 +38,8 @@ class ConformerOrdinalTrainer:
         pass
 
     def _get_data_loaders(self):
-        return DataLoader(self.data_sets.get_wrapped_train(), batch_size=self.batch_size, shuffle=True),\
+        return BalancedBatchSampler(self.data_sets.get_wrapped_train(), self.class_count,
+                                    self.batch_size // self.class_count),\
                DataLoader(self.data_sets.get_wrapped_test(), batch_size=self.batch_size)
 
     def _get_test_data_loader(self):
@@ -82,7 +85,10 @@ class ConformerOrdinalTrainer:
         self.model.train()
         predictions = []
         targets = []
+        indices = []
         for batch_no, data in enumerate(self.train_loader):
+            if "indices" in data.keys():
+                indices.extend(data["indices"])
             source = data["x"].to(self.device)
             target = data["y"].to(self.device)
             prediction = self.model(source)
@@ -104,7 +110,7 @@ class ConformerOrdinalTrainer:
         self._per_epoch_register("train_loss", self.epoch_loss.item())
         classifications = numpy.argmax(predictions, axis=1)
         for key in self.statistics.keys():
-            stat = self.statistics[key](classifications, targets, self.high, self.low)
+            stat = self.statistics[key](classifications, targets, self.high_train[indices], self.low_train[indices])
             self._per_epoch_register("train_%s" % key, stat)
             if stat is not None:
                 self.logger.report_scalar(title=key, series='Train', iteration=epoch_no, value=stat)
@@ -134,7 +140,7 @@ class ConformerOrdinalTrainer:
             classifications = numpy.argmax(predictions, axis=1)
             self._per_epoch_register("%s_loss" % prefix, self.epoch_loss.item())
             for key in self.statistics.keys():
-                stat = self.statistics[key](classifications, targets, self.high, self.low)
+                stat = self.statistics[key](classifications, targets, self.high_test, self.low_test)
                 self._per_epoch_register("%s_%s" % (prefix, key), stat)
 
                 if stat is not None:
@@ -166,3 +172,44 @@ class ConformerOrdinalTrainer:
             xaxis="class no",
             yaxis="class count",
         )
+
+
+class BalancedBatchSampler(BatchSampler):
+    """
+    BatchSampler - from a MNIST-like dataset, samples n_classes and within these classes samples n_samples.
+    Returns batches of size n_classes * n_samples
+    """
+
+    def __init__(self, dataset, n_classes, n_samples):
+        self.label_to_indices = {label: numpy.where(dataset.y == label)[0]
+                                 for label in range(n_classes)}
+        for l in range(n_classes):
+            numpy.random.shuffle(self.label_to_indices[l])
+        self.used_label_indices_count = {label: 0 for label in range(n_classes)}
+        self.count = 0
+        self.n_classes = n_classes
+        self.n_samples = n_samples
+        self.dataset = dataset
+        self.batch_size = self.n_samples * self.n_classes
+
+    def __iter__(self):
+        self.count = 0
+        while self.count + self.batch_size < len(self.dataset):
+            indices = []
+            for class_ in range(self.n_classes):
+                indices.extend(self.label_to_indices[class_][
+                               self.used_label_indices_count[class_]:self.used_label_indices_count[
+                                                                         class_] + self.n_samples])
+                self.used_label_indices_count[class_] += self.n_samples
+                if self.used_label_indices_count[class_] + self.n_samples > len(self.label_to_indices[class_]):
+                    numpy.random.shuffle(self.label_to_indices[class_])
+                    self.used_label_indices_count[class_] = 0
+            yield {
+                "x": torch.tensor(self.dataset.x[indices]).type(torch.FloatTensor),
+                "y": torch.tensor(self.dataset.y[indices]).type(torch.LongTensor),
+                "indices": indices
+            }
+            self.count += self.n_classes * self.n_samples
+
+    def __len__(self):
+        return len(self.dataset) // self.batch_size

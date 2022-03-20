@@ -25,7 +25,7 @@ async def trade():
     orderIds = []
     # async_client = AsyncClient(binance_api_key, binance_api_secret)
     async_client = AsyncClient(test_binance_api_key, test_binance_api_secret, testnet=True)
-    node, class_count, _, _= read_financial_leaf_sliding_window(data_config=data_config)
+    node, class_count, _, _, _, _ = read_financial_leaf_sliding_window(data_config=data_config)
     model = ConformerOrdinal(
         device,
         model_config["d_model"],
@@ -53,7 +53,7 @@ async def trade():
                 orderIds = orderIds.pop(i)
             else:
                 i += 1
-        node, class_count, high, low = read_financial_leaf_sliding_window(data_config=data_config)
+        node, class_count, _, _, high, low = read_financial_leaf_sliding_window(data_config=data_config)
         predict = model(
             torch.tensor(node.test.astype(float)).type(torch.FloatTensor).to(device)
         ).detach().cpu().numpy()
@@ -70,6 +70,8 @@ def play(action, high, low):
         quantityPrecision
     )
     position_side = "SHORT" if action == 0 else ("LONG" if action == 2 else None)
+    futures_price = client.futures_mark_price(symbol=data_config["dataset_name"])
+    print(futures_price)
     low = "{:0.0{}f}".format(low, pricePrecision)
     high = "{:0.0{}f}".format(high, pricePrecision)
     loss_price = low if position_side == "LONG" else high
